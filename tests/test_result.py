@@ -1,0 +1,393 @@
+"""
+Unit tests for Result<T> error handling.
+
+Tests cover all Result methods and edge cases.
+"""
+
+import pytest
+
+from omni_sdk.result import (
+    Result,
+    Error,
+    ErrorKinds,
+    create_error,
+    create_error_result,
+)
+
+
+class TestResultCreation:
+    """Tests for Result.ok and Result.err factory methods."""
+
+    def test_ok_creates_success_result(self):
+        result = Result.ok(42)
+        assert result.is_ok is True
+        assert result.unwrap() == 42
+
+    def test_ok_with_string_value(self):
+        result = Result.ok("test")
+        assert result.is_ok is True
+        assert result.unwrap() == "test"
+
+    def test_ok_with_none_value(self):
+        result = Result.ok(None)
+        assert result.is_ok is True
+        assert result.unwrap() is None
+
+    def test_err_creates_error_result(self):
+        error = Error(kind="TestError", message="Test failed")
+        result = Result.err(error)
+        assert result.is_ok is False
+        assert result.error() == error
+
+    def test_from_exception(self):
+        result = Result.from_exception(ValueError("bad value"), "RuntimeError")
+        assert result.is_ok is False
+        assert result.error().kind == "RuntimeError"
+        assert "bad value" in result.error().message
+
+
+class TestError:
+    """Tests for Error class."""
+
+    def test_error_creation(self):
+        error = Error(kind="NetworkError", message="Connection failed")
+        assert error.kind == "NetworkError"
+        assert error.message == "Connection failed"
+        assert error.details == {}
+        assert error.cause is None
+
+    def test_error_with_details(self):
+        error = Error(
+            kind="NetworkError",
+            message="Connection failed",
+            details={"host": "192.168.1.1", "port": 22}
+        )
+        assert error.details["host"] == "192.168.1.1"
+        assert error.details["port"] == 22
+
+    def test_error_with_cause(self):
+        cause = Error(kind="NetworkError", message="Network unreachable")
+        error = Error(
+            kind="SshError",
+            message="SSH connection failed",
+            cause=cause
+        )
+        assert error.cause == cause
+        assert error.cause.message == "Network unreachable"
+
+    def test_error_to_dict(self):
+        error = Error(
+            kind="TestError",
+            message="Test",
+            details={"key": "value"}
+        )
+        error_dict = error.to_dict()
+        assert error_dict["kind"] == "TestError"
+        assert error_dict["message"] == "Test"
+        assert error_dict["details"] == {"key": "value"}
+
+    def test_error_to_dict_with_cause(self):
+        cause = Error(kind="CauseError", message="Cause")
+        error = Error(
+            kind="TestError",
+            message="Test",
+            cause=cause
+        )
+        error_dict = error.to_dict()
+        assert "cause" in error_dict
+        assert error_dict["cause"]["kind"] == "CauseError"
+
+
+class TestUnwrap:
+    """Tests for unwrap methods."""
+
+    def test unwrap_ok(self):
+        result = Result.ok(42)
+        assert result.unwrap() == 42
+
+    def test unwrap_err_raises(self):
+        error = Error(kind="TestError", message="Failed")
+        result = Result.err(error)
+        with pytest.raises(RuntimeError, match="Attempted to unwrap error"):
+            result.unwrap()
+
+    def test unwrap_or_with_ok(self):
+        result = Result.ok(42)
+        assert result.unwrap_or(99) == 42
+
+    def test unwrap_or_with_err(self):
+        error = Error(kind="TestError", message="Failed")
+        result = Result.err(error)
+        assert result.unwrap_or(99) == 99
+
+    def test unwrap_or_else_with_ok(self):
+        result = Result.ok(42)
+        assert result.unwrap_or_else(lambda e: 99) == 42
+
+    def test unwrap_or_else_with_err(self):
+        error = Error(kind="TestError", message="Failed")
+        result = Result.err(error)
+        assert result.unwrap_or_else(lambda e: 99) == 99
+
+
+class TestMap:
+    """Tests for map method."""
+
+    def test_map_on_ok(self):
+        result = Result.ok(42).map(lambda x: x * 2)
+        assert result.is_ok is True
+        assert result.unwrap() == 84
+
+    def test_map_on_err(self):
+        error = Error(kind="TestError", message="Failed")
+        result = Result.err(error).map(lambda x: x * 2)
+        assert result.is_ok is False
+        assert result.error() == error
+
+    def test_map_changes_type(self):
+        result = Result.ok(10).map(lambda x: str(x))
+        assert result.is_ok is True
+        assert result.unwrap() == "10"
+
+    def test_map_exception_becomes_error(self):
+        result = Result.ok(42).map(lambda x: x / 0)
+        assert result.is_ok is False
+        assert result.error().kind == "RuntimeError"
+        assert "division by zero" in result.error().message
+
+    def test_map_chain(self):
+        result = Result.ok(10) \
+            .map(lambda x: x * 2) \
+            .map(lambda x: x + 5) \
+            .map(lambda x: str(x))
+        assert result.unwrap() == "25"
+
+
+class TestAndThen:
+    """Tests for and_then method (short-circuiting)."""
+
+    def test_and_then_chain_all_ok(self):
+        def add_5(x: int) -> Result[int]:
+            return Result.ok(x + 5)
+
+        result = Result.ok(10) \
+            .and_then(add_5) \
+            .and_then(lambda x: Result.ok(x * 2))
+
+        assert result.is_ok is True
+        assert result.unwrap() == 30  # (10 + 5) * 2
+
+    def test_and_then_short_circuits_on_error(self):
+        call_count = [0]
+
+        def add_5(x: int) -> Result[int]:
+            return Result.ok(x + 5)
+
+        def fail(x: int) -> Result[int]:
+            call_count[0] += 1
+            return Result.err(Error(kind="TestError", message="Failed"))
+
+        def should_not_be_called(x: int) -> Result[int]:
+            call_count[0] += 1
+            return Result.ok(x)
+
+        result = Result.ok(10) \
+            .and_then(add_5) \
+            .and_then(fail) \
+            .and_then(should_not_be_called)
+
+        assert result.is_ok is False
+        assert call_count[0] == 1  # Only fail() was called
+
+    def test_and_then_from_error_stays_error(self):
+        error = Error(kind="TestError", message="Failed")
+        result = Result.err(error).and_then(lambda x: Result.ok(x + 5))
+        assert result.is_ok is False
+        assert result.error() == error
+
+    def test_and_then_exception_in_function(self):
+        def throw(x: int) -> Result[int]:
+            raise ValueError("Thrown error")
+
+        result = Result.ok(10).and_then(throw)
+        assert result.is_ok is False
+        assert result.error().kind == "RuntimeError"
+        assert "Thrown error" in result.error().message
+
+
+class TestOrElse:
+    """Tests for or_else method (error recovery)."""
+
+    def test_or_else_on_ok_returns_original(self):
+        result = Result.ok(42).or_else(lambda e: Result.ok(99))
+        assert result.is_ok is True
+        assert result.unwrap() == 42
+
+    def test_or_else_on_err_calls_fallback(self):
+        error = Error(kind="TestError", message="Failed")
+        result = Result.err(error).or_else(lambda e: Result.ok(99))
+        assert result.is_ok is True
+        assert result.unwrap() == 99
+
+    def test_or_else_with_different_error(self):
+        error = Error(kind="TestError", message="Failed")
+        result = Result.err(error).or_else(
+            lambda e: Result.err(Error(kind="OtherError", message="Fallback"))
+        )
+        assert result.is_ok is False
+        assert result.error().kind == "OtherError"
+
+    def test_or_else_exception_in_fallback(self):
+        error = Error(kind="TestError", message="Failed")
+        result = Result.err(error).or_else(lambda e: (_ for _ in ()).throw(Exception("Oops")))
+        assert result.is_ok is False
+        assert result.error().kind == "RuntimeError"
+        assert "Oops" in result.error().message
+
+
+class TestAccessors:
+    """Tests for accessor methods."""
+
+    def test_value_on_ok(self):
+        result = Result.ok(42)
+        assert result.value() == 42
+
+    def test_value_on_err(self):
+        error = Error(kind="TestError", message="Failed")
+        result = Result.err(error)
+        assert result.value() is None
+
+    def test_error_on_ok(self):
+        result = Result.ok(42)
+        assert result.error() is None
+
+    def test_error_on_err(self):
+        error = Error(kind="TestError", message="Failed")
+        result = Result.err(error)
+        assert result.error() == error
+
+
+class TestRepr:
+    """Tests for __repr__ representation."""
+
+    def test_repr_ok(self):
+        result = Result.ok(42)
+        assert repr(result) == "Result.ok(42)"
+
+    def test_repr_err(self):
+        error = Error(kind="TestError", message="Failed")
+        result = Result.err(error)
+        assert repr(result).startswith("Result.err(")
+
+
+class TestHelperFunctions:
+    """Tests for helper functions."""
+
+    def test_create_error(self):
+        error = create_error(
+            kind="TestError",
+            message="Test failed",
+            details={"key": "value"}
+        )
+        assert error.kind == "TestError"
+        assert error.message == "Test failed"
+        assert error.details["key"] == "value"
+
+    def test_create_error_result(self):
+        result = create_error_result(
+            kind="TestError",
+            message="Test failed"
+        )
+        assert result.is_ok is False
+        assert result.error().kind == "TestError"
+        assert result.error().message == "Test failed"
+
+    def test_error_kinds_constants(self):
+        assert ErrorKinds.NETWORK_ERROR == "NetworkError"
+        assert ErrorKinds.CONNECTION_ERROR == "ConnectionError"
+        assert ErrorKinds.CONFIG_ERROR == "ConfigError"
+        assert ErrorKinds.SSH_ERROR == "SshError"
+        assert ErrorKinds.SERIAL_ERROR == "SerialError"
+
+
+class TestComplexChaining:
+    """Tests for complex operation chains."""
+
+    def test_load_validate_parse_chain(self):
+        """Simulate load config -> validate -> parse workflow."""
+
+        def load_config(path: str) -> Result[dict]:
+            if path == "invalid.toml":
+                return Result.err(Error(
+                    kind=ErrorKinds.CONFIG_ERROR,
+                    message=f"Config file not found: {path}"
+                ))
+            return Result.ok({"host": "192.168.1.1", "port": 22})
+
+        def validate_config(config: dict) -> Result[dict]:
+            if "host" not in config:
+                return Result.err(Error(
+                    kind=ErrorKinds.CONFIG_VALIDATION_ERROR,
+                    message="Missing required field: host"
+                ))
+            return Result.ok(config)
+
+        def parse_client_config(config: dict) -> Result[tuple]:
+            return Result.ok((config["host"], config.get("port", 22)))
+
+        # Happy path
+        result = load_config("devices.toml") \
+            .and_then(validate_config) \
+            .and_then(parse_client_config)
+
+        assert result.is_ok is True
+        assert result.unwrap() == ("192.168.1.1", 22)
+
+        # Error path (invalid file)
+        result = load_config("invalid.toml") \
+            .and_then(validate_config) \
+            .and_then(parse_client_config)
+
+        assert result.is_ok is False
+        assert result.error().kind == ErrorKinds.CONFIG_ERROR
+        assert "not found" in result.error().message
+
+        # Error path (validation failure)
+        result = load_config("devices.toml").map(lambda cfg: {"port": 22}) \
+            .and_then(validate_config) \
+            .and_then(parse_client_config)
+
+        assert result.is_ok is False
+        assert result.error().kind == ErrorKinds.CONFIG_VALIDATION_ERROR
+        assert "Missing required field" in result.error().message
+
+    def test_retry_pattern_with_or_else(self):
+        """Simulate retry logic using or_else."""
+
+        attempt = [0]
+
+        def connect(host: str) -> Result[str]:
+            attempt[0] += 1
+            if attempt[0] < 3:
+                return Result.err(Error(
+                    kind=ErrorKinds.CONNECTION_ERROR,
+                    message=f"Connection attempt {attempt[0]} failed",
+                    details={"attempt": attempt[0]}
+                ))
+            return Result.ok(f"Connected to {host}")
+
+        def retry(result: Result[str]) -> Result[str]:
+            if attempt[0] < 3:
+                return connect(host)
+            return result
+
+        host = "192.168.1.1"
+        result = connect(host).or_else(retry).or_else(retry)
+
+        assert result.is_ok is True
+        assert result.unwrap() == f"Connected to {host}"
+        assert attempt[0] == 3
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

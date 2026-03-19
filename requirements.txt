@@ -1,0 +1,17 @@
+# Omni-SDK-Py Dependencies
+
+# Testing
+pytest>=7.0.0
+pytest-cov>=4.0.0
+
+# Configuration
+tomli>=2.0.0
+
+# SSH Client
+paramiko>=3.0.0
+
+# Serial Client
+pyserial>=3.5
+
+# Validation
+pydantic>=2.0.0
