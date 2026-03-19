@@ -1,0 +1,55 @@
+# Omni SDK - Example Configuration File
+# Demonstrates configuration for SSH and Serial clients
+
+[global]
+log_level = "info"
+default_timeout_ms = 5000
+retry_attempts = 3
+
+[[devices]]
+id = "device-001"
+name = "Production Router"
+
+[devices.metadata]
+  location = "Rack A1"
+  owner = "Network Team"
+
+[devices.clients.ssh]
+  host = "192.168.1.1"
+  port = 22
+  username = "admin"
+  # password_file = "/etc/secrets/device-001-ssh.txt"
+  # key_file = "/home/user/.ssh/id_rsa"
+  timeout_ms = 10000
+
+[[devices]]
+id = "device-002"
+name = "Serial-Connected Sensor"
+
+[devices.metadata]
+  location = "Lab Bench 3"
+  owner = "Hardware Team"
+
+[devices.clients.serial]
+  port = "/dev/ttyUSB0"
+  baud_rate = 115200
+  data_bits = 8
+  stop_bits = 1
+  parity = "none"
+  timeout_ms = 3000
+
+# Example: Device with multiple clients
+# [[devices]]
+# id = "device-003"
+# name = "Multi-Protocol Gateway"
+
+# [devices.clients.ssh]
+#   host = "192.168.1.3"
+#   port = 22
+#   username = "admin"
+#   password = "secret"
+
+# [devices.clients.http]
+#   base_url = "http://192.168.1.3:8080"
+#   headers = { "Content-Type" = "application/json", "User-Agent" = "OmniSDK/1.0" }
+#   timeout_ms = 5000
