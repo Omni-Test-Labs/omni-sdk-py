@@ -4,9 +4,9 @@ Configuration system using TOML files and pydantic validation.
 Defines schemas for device and client configuration, with validation.
 """
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, cast
 from pydantic import BaseModel, field_validator, ConfigDict
-import tomli  # For reading TOML files
+import tomli
 from .result import Result, ErrorKinds, create_error_result
 
 
@@ -48,6 +48,7 @@ class SerialConfig(ClientConfig):
     data_bits: int = 8
     stop_bits: int = 1
     parity: str = "none"
+    flow_control: str = "none"  # "none", "rtscts", "xonxoff"
 
     @field_validator("port")
     @classmethod
@@ -64,12 +65,34 @@ class SerialConfig(ClientConfig):
             raise ValueError(f"Invalid baud rate {v}. Valid rates: {valid_rates}")
         return v
 
+    @field_validator("data_bits")
+    @classmethod
+    def validate_data_bits(cls, v: int) -> int:
+        if v not in [5, 6, 7, 8]:
+            raise ValueError(f"Invalid data bits {v}. Must be 5, 6, 7, or 8")
+        return v
+
+    @field_validator("stop_bits")
+    @classmethod
+    def validate_stop_bits(cls, v: int) -> int:
+        if v not in [1, 2]:
+            raise ValueError(f"Invalid stop bits {v}. Must be 1 or 2")
+        return v
+
     @field_validator("parity")
     @classmethod
     def validate_parity(cls, v: str) -> str:
         valid_parities = ["none", "even", "odd", "mark", "space"]
         if v.lower() not in valid_parities:
             raise ValueError(f"Invalid parity '{v}'. Valid values: {valid_parities}")
+        return v.lower()
+
+    @field_validator("flow_control")
+    @classmethod
+    def validate_flow_control(cls, v: str) -> str:
+        valid_types = ["none", "rtscts", "xonxoff"]
+        if v.lower() not in valid_types:
+            raise ValueError(f"Invalid flow control '{v}'. Valid values: {valid_types}")
         return v.lower()
 
 
@@ -262,7 +285,7 @@ class ConfigLoader:
         """
         load_result = ConfigLoader.load(path)
         if not load_result.is_ok:
-            return load_result  # Error propagates
+            return cast(Result[SdkConfig], load_result)
 
         config_data = load_result.unwrap()
         return ConfigLoader.validate(config_data)

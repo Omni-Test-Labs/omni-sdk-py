@@ -9,6 +9,7 @@ from .result import Result, ErrorKinds, create_error_result
 from .device import Device
 from .config import ConfigLoader, SdkConfig
 from .clients.ssh_client import SshClient
+from .clients.serial_client import SerialClient
 from .client import Client as ClientInterface
 
 if TYPE_CHECKING:
@@ -52,10 +53,12 @@ def initialize_from_config(config_path: str) -> Result[Dict[str, Device]]:
     # Create devices
     devices: Dict[str, Device] = {}
 
-    # Client registry - add clients as they are implemented
-    client_registry: Dict[str, ClientInterface] = {"ssh": SshClient()}
-    # client_registry['serial'] = SerialClient()  # Will be added when implemented
-    # client_registry['http'] = HttpClient()
+    # Client registry
+    client_registry: Dict[str, ClientInterface] = {
+        "ssh": SshClient(),
+        "serial": SerialClient(),
+    }
+    # client_registry['http'] = HttpClient()  # Will be added when implemented
 
     for device_config in config.devices:
         # Create device with plain config dict (Device expects dict, not pydantic model)
@@ -127,6 +130,7 @@ __all__ = [
     "ConfigLoader",
     "SdkConfig",
     "SshClient",
+    "SerialClient",
     "initialize_from_config",
     "connect_device",
 ]
