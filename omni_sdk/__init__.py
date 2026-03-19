@@ -8,15 +8,11 @@ from typing import Dict, TYPE_CHECKING, cast
 from .result import Result, ErrorKinds, create_error_result
 from .device import Device
 from .config import ConfigLoader, SdkConfig
+from .clients.ssh_client import SshClient
+from .client import Client as ClientInterface
 
 if TYPE_CHECKING:
     from .client import Client
-
-
-# Client imports - will be added as implemented
-# from .clients.ssh_client import SshClient
-# from .clients.serial_client import SerialClient
-# from .clients.http_client import HttpClient
 
 
 def initialize_from_config(config_path: str) -> Result[Dict[str, Device]]:
@@ -57,9 +53,8 @@ def initialize_from_config(config_path: str) -> Result[Dict[str, Device]]:
     devices: Dict[str, Device] = {}
 
     # Client registry - add clients as they are implemented
-    client_registry: Dict[str, "Client"] = {}
-    # client_registry['ssh'] = SshClient()  # Will be uncommented when implemented
-    # client_registry['serial'] = SerialClient()
+    client_registry: Dict[str, ClientInterface] = {"ssh": SshClient()}
+    # client_registry['serial'] = SerialClient()  # Will be added when implemented
     # client_registry['http'] = HttpClient()
 
     for device_config in config.devices:
@@ -131,6 +126,7 @@ __all__ = [
     "Device",
     "ConfigLoader",
     "SdkConfig",
+    "SshClient",
     "initialize_from_config",
     "connect_device",
 ]
