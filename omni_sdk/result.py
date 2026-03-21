@@ -91,6 +91,11 @@ class Result(Generic[T]):
     _value: Optional[T] = None
     _error: Optional[Error] = None
 
+    @property
+    def is_err(self) -> bool:
+        """Return True if this is an error result."""
+        return not self.is_ok
+
     @staticmethod
     def ok(value: T) -> "Result[T]":
         """
@@ -152,8 +157,6 @@ class Result(Generic[T]):
         """
         if not self.is_ok:
             raise RuntimeError(f"Attempted to unwrap error: {self._error}")
-        # Type assertion needed because _value is Optional[T] but is_ok=True means it's not None
-        assert self._value is not None
         return self._value
 
     def unwrap_or(self, default: T) -> T:

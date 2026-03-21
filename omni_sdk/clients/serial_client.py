@@ -6,8 +6,8 @@ Provides serial port management and data transfer capabilities.
 
 from typing import Dict, Any
 import serial as pyserial
-from .client import Client
-from .result import Result, ErrorKinds, create_error_result
+from ..client import Client
+from ..result import Result, ErrorKinds, create_error_result
 
 
 class SerialClient(Client):

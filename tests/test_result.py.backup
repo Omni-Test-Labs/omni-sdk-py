@@ -98,29 +98,37 @@ class TestError:
         assert error_dict["cause"]["kind"] == "CauseError"
 
 
-
-
 class TestUnwrap:
     """Tests for unwrap methods."""
 
-    def test_unwrap_ok(self):
+    def test unwrap_ok(self):
         result = Result.ok(42)
         assert result.unwrap() == 42
 
-    def test_unwrap_err_raises(self):
+    def test unwrap_err_raises(self):
         error = Error(kind="TestError", message="Failed")
         result = Result.err(error)
         with pytest.raises(RuntimeError, match="Attempted to unwrap error"):
             result.unwrap()
 
-    def test_unwrap_or_with_ok(self):
+    def test unwrap_or_with_ok(self):
         result = Result.ok(42)
         assert result.unwrap_or(99) == 42
 
-    def test_unwrap_or_with_err(self):
+    def test unwrap_or_with_err(self):
         error = Error(kind="TestError", message="Failed")
         result = Result.err(error)
         assert result.unwrap_or(99) == 99
+
+    def test unwrap_or_else_with_ok(self):
+        result = Result.ok(42)
+        assert result.unwrap_or_else(lambda e: 99) == 42
+
+    def test unwrap_or_else_with_err(self):
+        error = Error(kind="TestError", message="Failed")
+        result = Result.err(error)
+        assert result.unwrap_or_else(lambda e: 99) == 99
+
 
 class TestMap:
     """Tests for map method."""

@@ -6,8 +6,8 @@ Provides SSH connection management and command execution capabilities.
 
 from typing import Dict, Any
 import paramiko
-from .client import Client
-from .result import Result, ErrorKinds, create_error_result
+from ..client import Client
+from ..result import Result, ErrorKinds, create_error_result
 
 
 class SshClient(Client):

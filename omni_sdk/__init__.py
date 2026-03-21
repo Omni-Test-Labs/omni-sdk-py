@@ -7,7 +7,14 @@ Public API for managing devices with SSH, Serial, HTTP, and other protocols.
 from typing import Dict, TYPE_CHECKING, cast
 from .result import Result, ErrorKinds, create_error_result
 from .device import Device
-from .config import ConfigLoader, SdkConfig
+from .config import (
+    ConfigLoader,
+    SdkConfig,
+    DeviceConfig,
+    SshConfig,
+    SerialConfig,
+    ClientConfig,
+)
 from .clients.ssh_client import SshClient
 from .clients.serial_client import SerialClient
 from .client import Client as ClientInterface
@@ -129,6 +136,10 @@ __all__ = [
     "Device",
     "ConfigLoader",
     "SdkConfig",
+    "DeviceConfig",
+    "SshConfig",
+    "SerialConfig",
+    "ClientConfig",
     "SshClient",
     "SerialClient",
     "initialize_from_config",

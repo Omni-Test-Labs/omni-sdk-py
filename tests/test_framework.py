@@ -93,6 +93,7 @@ class TestDevice:
 
         config = {}
         mock_client.initialize.return_value = Result.ok(None)
+        mock_client.capabilities.return_value = {"connect": "Connect via SSH"}
 
         # First add succeeds
         result = self.device.add_client(mock_client)
@@ -200,7 +201,9 @@ class TestConfigModels:
 
     def test_ssh_config_missing_required(self):
         """Missing required fields raise validation error."""
-        with pytest.raises(ValueError, match="Missing required"):
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError, match="Field required"):
             SshConfig(host="192.168.1.1")
 
     def test_serial_config_valid(self):

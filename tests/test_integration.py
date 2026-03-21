@@ -71,17 +71,18 @@ name = "Test Serial"
             # Track if client is instantiated and initialized
             client_instances = []
 
-            def mock_init(self):
-                client_instances.append(self)
-                self.initialize.return_value = Result.ok(None)
-                self.name = "ssh"
-                self.capabilities.return_value = {
+            def create_mock_ssh_client():
+                mock_client = Mock(spec=SshClient)
+                mock_client.initialize.return_value = Result.ok(None)
+                mock_client.name = "ssh"
+                mock_client.capabilities.return_value = {
                     "execute": "Execute command",
                     "get_status": "Get status",
                 }
+                client_instances.append(mock_client)
+                return mock_client
 
-            MockSshClient.side_effect = lambda: Mock(spec=SshClient)
-            MockSshClient.__init__ = mock_init
+            MockSshClient.side_effect = create_mock_ssh_client
 
             result = initialize_from_config(str(temp_config_file))
 
